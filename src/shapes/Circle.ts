@@ -61,8 +61,8 @@ export class Circle extends Shape {
     throw new EditorError(`unknown attribute: ${attr}`);
   }
 
-  toTreeLine(): string {
-    return `circle#${this.id}  cx=${this.formatNumber(this.cx)} cy=${this.formatNumber(this.cy)} r=${this.formatNumber(this.r)}${this.styleTreeSuffix()}`;
+  treeGeometry(): string {
+    return `cx=${this.formatNumber(this.cx)} cy=${this.formatNumber(this.cy)} r=${this.formatNumber(this.r)}`;
   }
 
   cloneDeep(): Circle {
@@ -79,9 +79,5 @@ export class Circle extends Shape {
 
   positionLabel(): string {
     return `(${this.formatNumber(this.cx)},${this.formatNumber(this.cy)})`;
-  }
-
-  showBody(): string {
-    return `  cx=${this.formatNumber(this.cx)} cy=${this.formatNumber(this.cy)} r=${this.formatNumber(this.r)}`;
   }
 }

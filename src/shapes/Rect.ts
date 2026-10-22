@@ -70,8 +70,8 @@ export class Rect extends Shape {
     throw new EditorError(`unknown attribute: ${attr}`);
   }
 
-  toTreeLine(): string {
-    return `rect#${this.id}        x=${this.formatNumber(this.x)} y=${this.formatNumber(this.y)} w=${this.formatNumber(this.width)} h=${this.formatNumber(this.height)}${this.styleTreeSuffix()}`;
+  treeGeometry(): string {
+    return `x=${this.formatNumber(this.x)} y=${this.formatNumber(this.y)} w=${this.formatNumber(this.width)} h=${this.formatNumber(this.height)}`;
   }
 
   cloneDeep(): Rect {
@@ -84,9 +84,5 @@ export class Rect extends Shape {
   override toSvg(indent: number): string {
     const pad = "  ".repeat(indent);
     return `${pad}<rect id="${this.escape(this.id)}" x="${this.formatNumber(this.x)}" y="${this.formatNumber(this.y)}" width="${this.formatNumber(this.width)}" height="${this.formatNumber(this.height)}"${this.styleAttributeString()}/>`;
-  }
-
-  showBody(): string {
-    return `  x=${this.formatNumber(this.x)} y=${this.formatNumber(this.y)} w=${this.formatNumber(this.width)} h=${this.formatNumber(this.height)}`;
   }
 }

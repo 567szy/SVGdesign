@@ -72,8 +72,8 @@ export class Line extends Shape {
     throw new EditorError(`unknown attribute: ${attr}`);
   }
 
-  toTreeLine(): string {
-    return `line#${this.id}          (${this.formatNumber(this.x1)},${this.formatNumber(this.y1)}) -> (${this.formatNumber(this.x2)},${this.formatNumber(this.y2)})${this.styleTreeSuffix()}`;
+  treeGeometry(): string {
+    return `(${this.formatNumber(this.x1)},${this.formatNumber(this.y1)}) -> (${this.formatNumber(this.x2)},${this.formatNumber(this.y2)})`;
   }
 
   cloneDeep(): Line {
@@ -86,9 +86,5 @@ export class Line extends Shape {
   override toSvg(indent: number): string {
     const pad = "  ".repeat(indent);
     return `${pad}<line id="${this.escape(this.id)}" x1="${this.formatNumber(this.x1)}" y1="${this.formatNumber(this.y1)}" x2="${this.formatNumber(this.x2)}" y2="${this.formatNumber(this.y2)}"${this.styleAttributeString()}/>`;
-  }
-
-  showBody(): string {
-    return `  x1=${this.formatNumber(this.x1)} y1=${this.formatNumber(this.y1)} x2=${this.formatNumber(this.x2)} y2=${this.formatNumber(this.y2)}`;
   }
 }

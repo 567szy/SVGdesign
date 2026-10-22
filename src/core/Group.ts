@@ -93,8 +93,8 @@ export class Group extends Shape {
     throw new EditorError(`unknown attribute: ${attr}`);
   }
 
-  toTreeLine(): string {
-    return `g#${this.id}`;
+  treeGeometry(): string {
+    return "";
   }
 
   cloneDeep(): Group {

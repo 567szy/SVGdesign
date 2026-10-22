@@ -70,8 +70,8 @@ export class Ellipse extends Shape {
     throw new EditorError(`unknown attribute: ${attr}`);
   }
 
-  toTreeLine(): string {
-    return `ellipse#${this.id}     cx=${this.formatNumber(this.cx)} cy=${this.formatNumber(this.cy)} rx=${this.formatNumber(this.rx)} ry=${this.formatNumber(this.ry)}${this.styleTreeSuffix()}`;
+  treeGeometry(): string {
+    return `cx=${this.formatNumber(this.cx)} cy=${this.formatNumber(this.cy)} rx=${this.formatNumber(this.rx)} ry=${this.formatNumber(this.ry)}`;
   }
 
   cloneDeep(): Ellipse {
@@ -84,9 +84,5 @@ export class Ellipse extends Shape {
   override toSvg(indent: number): string {
     const pad = "  ".repeat(indent);
     return `${pad}<ellipse id="${this.escape(this.id)}" cx="${this.formatNumber(this.cx)}" cy="${this.formatNumber(this.cy)}" rx="${this.formatNumber(this.rx)}" ry="${this.formatNumber(this.ry)}"${this.styleAttributeString()}/>`;
-  }
-
-  showBody(): string {
-    return `  cx=${this.formatNumber(this.cx)} cy=${this.formatNumber(this.cy)} rx=${this.formatNumber(this.rx)} ry=${this.formatNumber(this.ry)}`;
   }
 }

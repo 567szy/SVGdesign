@@ -94,7 +94,14 @@ export class SvgDocument {
   show(id: string): string {
     const shape = this.ids.get(id);
     const parent = shape.parent ? `g#${shape.parent.id}` : "svg";
-    const lines = [`${shape.tagName}#${shape.id}  parent=${parent}`, shape.toTreeLine()];
+    const lines = [`${shape.treeLabel()}  parent=${parent}`];
+    const geometry = shape.treeGeometry();
+    if (geometry) {
+      lines.push(`  ${geometry}`);
+    }
+    for (const attribute of shape.treeStyleAttributes()) {
+      lines.push(`  ${attribute}`);
+    }
     return lines.join("\n");
   }
 
@@ -110,10 +117,13 @@ export class SvgDocument {
   }
 
   private appendTree(lines: string[], shapes: Shape[], prefix: string): void {
+    const width = shapes.reduce((max, shape) => Math.max(max, shape.treeLabel().length), 0) + 2;
     shapes.forEach((shape, index) => {
       const last = index === shapes.length - 1;
       const branch = last ? "└── " : "├── ";
-      lines.push(`${prefix}${branch}${shape.toTreeLine()}`);
+      const detail = shape.treeDetail();
+      const head = `${prefix}${branch}${shape.treeLabel().padEnd(width)}`;
+      lines.push(detail ? `${head}${detail}`.trimEnd() : head.trimEnd());
       const childPrefix = prefix + (last ? "    " : "│   ");
       this.appendTree(lines, shape.children(), childPrefix);
     });

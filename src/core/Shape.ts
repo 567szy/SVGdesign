@@ -46,7 +46,35 @@ export abstract class Shape {
     }
     return undefined;
   }
-  abstract toTreeLine(): string;
+  treeLabel(): string {
+    return `${this.tagName}#${this.id}`;
+  }
+
+  abstract treeGeometry(): string;
+
+  treeStyleAttributes(): string[] {
+    const attributes: string[] = [];
+    if (this.fill !== undefined) {
+      attributes.push(`fill=${this.fill}`);
+    }
+    if (this.stroke !== undefined) {
+      attributes.push(`stroke=${this.stroke}`);
+    }
+    if (this.strokeWidth !== undefined) {
+      attributes.push(`stroke-width=${this.strokeWidth}`);
+    }
+    return attributes;
+  }
+
+  treeDetail(): string {
+    return [this.treeGeometry(), ...this.treeStyleAttributes()].filter((part) => part.length > 0).join(" ");
+  }
+
+  toTreeLine(): string {
+    const detail = this.treeDetail();
+    return detail ? `${this.treeLabel()} ${detail}` : this.treeLabel();
+  }
+
   abstract cloneDeep(): Shape;
 
   toSvg(indent: number): string {
@@ -87,20 +115,6 @@ export abstract class Shape {
       return true;
     }
     return false;
-  }
-
-  protected styleTreeSuffix(): string {
-    const parts: string[] = [];
-    if (this.fill !== undefined) {
-      parts.push(`fill=${this.fill}`);
-    }
-    if (this.stroke !== undefined) {
-      parts.push(`stroke=${this.stroke}`);
-    }
-    if (this.strokeWidth !== undefined) {
-      parts.push(`stroke-width=${this.strokeWidth}`);
-    }
-    return parts.length > 0 ? ` ${parts.join(" ")}` : "";
   }
 
   protected escape(value: string): string {

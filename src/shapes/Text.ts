@@ -62,8 +62,8 @@ export class Text extends Shape {
     throw new EditorError(`unknown attribute: ${attr}`);
   }
 
-  toTreeLine(): string {
-    return `text#${this.id}     (${this.formatNumber(this.x)},${this.formatNumber(this.y)}) "${this.content}"${this.styleTreeSuffix()}`;
+  treeGeometry(): string {
+    return `(${this.formatNumber(this.x)},${this.formatNumber(this.y)}) "${this.content}"`;
   }
 
   cloneDeep(): Text {
@@ -77,9 +77,5 @@ export class Text extends Shape {
   override toSvg(indent: number): string {
     const pad = "  ".repeat(indent);
     return `${pad}<text id="${this.escape(this.id)}" x="${this.formatNumber(this.x)}" y="${this.formatNumber(this.y)}"${this.styleAttributeString()}>${this.escape(this.content)}</text>`;
-  }
-
-  showBody(): string {
-    return `  x=${this.formatNumber(this.x)} y=${this.formatNumber(this.y)}\n  text="${this.content}"`;
   }
 }
