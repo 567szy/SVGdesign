@@ -1,7 +1,9 @@
 import { EditorError } from "../core/EditorError.js";
 import { Group } from "../core/Group.js";
 import { SvgDocument } from "../core/SvgDocument.js";
+import type { Shape } from "../core/Shape.js";
 import { ShapeFactory } from "../shapes/ShapeFactory.js";
+import { findUnsupportedTransforms, parseTransform } from "./Transform.js";
 
 interface XmlNode {
   tag: string;
@@ -19,13 +21,38 @@ export class SvgReader {
     const width = Number(root.attrs.width ?? "800");
     const height = Number(root.attrs.height ?? "600");
     const document = new SvgDocument(width, height);
+    const transformed: { shape: Shape; dx: number; dy: number; scale: number }[] = [];
     for (const child of root.children) {
-      document.add(this.toShape(child, document, warnings));
+      document.add(this.toShape(child, document, warnings, transformed));
     }
+    this.applyTransforms(transformed);
     return { document, warnings };
   }
 
-  private toShape(node: XmlNode, document: SvgDocument, warnings: string[]): ReturnType<ShapeFactory["fromTag"]> {
+  /**
+   * Entries are collected while walking the tree, so an inner group is recorded
+   * before the group that contains it. SVG nests transforms: the innermost one
+   * applies to the raw coordinates first, each outer one afterwards.
+   */
+  private applyTransforms(
+    entries: { shape: Shape; dx: number; dy: number; scale: number }[],
+  ): void {
+    for (const entry of entries) {
+      if (entry.scale !== 1) {
+        entry.shape.scale(entry.scale);
+      }
+      if (entry.dx !== 0 || entry.dy !== 0) {
+        entry.shape.move(entry.dx, entry.dy);
+      }
+    }
+  }
+
+  private toShape(
+    node: XmlNode,
+    document: SvgDocument,
+    warnings: string[],
+    transformed: { shape: Shape; dx: number; dy: number; scale: number }[],
+  ): ReturnType<ShapeFactory["fromTag"]> {
     let id = node.attrs.id;
     if (!id) {
       id = document.ids.assignMissingId(node.tag);
@@ -48,7 +75,15 @@ export class SvgReader {
     }
     if (shape instanceof Group) {
       for (const child of node.children) {
-        shape.addChild(this.toShape(child, document, warnings));
+        shape.addChild(this.toShape(child, document, warnings, transformed));
+      }
+      const transform = parseTransform(node.attrs.transform);
+      if (transform.dx !== 0 || transform.dy !== 0 || transform.scale !== 1) {
+        transformed.push({ shape, ...transform });
+      }
+      const unsupported = findUnsupportedTransforms(node.attrs.transform);
+      for (const name of unsupported) {
+        warnings.push(`warning: unsupported transform ignored on <${node.tag}>: ${name}`);
       }
     }
     return shape;
