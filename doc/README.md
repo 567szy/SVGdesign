@@ -39,10 +39,14 @@ package io {
 }
 [Repl] --> [CommandFactory]
 [Repl] --> [CommandInvoker]
+[Repl] --> [SvgReader]
+[Repl] --> [SvgWriter]
 [CommandFactory] --> [Command classes]
 [CommandInvoker] --> [Editor]
 [Command classes] --> [SvgDocument]
 [Command classes] --> [ShapeFactory]
+[Command classes] -.-> [SvgReader]
+[Command classes] -.-> [SvgWriter]
 [SvgReader] --> [ShapeFactory]
 [SvgWriter] --> [SvgDocument]
 [Group] --|> [Shape]
@@ -78,6 +82,8 @@ package io {
 允许：
 
 - `cli` → `commands` → `core` / `shapes`
+- `cli` → `io`：入口处组装 reader / writer 并注入命令层（组合根，只有 `Repl` 一处）
+- `commands` → `io`：仅 `read` / `save` 两条命令注入 reader / writer 时使用（见 §5.8，是实现中补充的规则）
 - `io` → `core` / `shapes`
 - `shapes` → `core`
 - `core` 不依赖 `cli`、`commands`、`io`
@@ -86,6 +92,9 @@ package io {
 
 - 核心模型依赖 REPL 或文件系统
 - 图形类依赖具体 Command 类
+- `io` 反向引用 `commands`（否则与 `commands` → `io` 形成环）
+
+理由：依赖只能自上而下。模型层不认识 CLI，才能脱离 REPL 单独实例化和验证；命令层只认抽象（`Shape` / `SvgDocument`），换掉 SVG 读写或换成 GUI 前端时不用改；`io` 是可替换的叶子模块，唯一入口是注入，不在命令内部 `new`。
 
 ## 4. 变化点假设
 
@@ -98,7 +107,7 @@ package io {
 
 ## 5. 过程记录（与 AI 协作）
 
-全程用 AI 编程助手（Cursor 内的 Agent）辅助：我负责定架构约束、跑验证、判断每条建议是否成立；AI 负责按约束出方案和写实现。下面记录的是**我认为最有代表性的几次"AI 给出的东西有问题，我如何确认并纠正"**，而不是功能清单。
+全程用 AI 编程助手（Cursor 内的 Agent）辅助：我负责定架构约束、跑验证、判断每条建议是否成立；AI 负责按约束出方案和写实现。下面记录的是**我认为最有代表性的几次"AI 给出的东西有问题，我如何确认并纠正"**。
 
 ### 5.1 第一版方案是个上帝类，我推翻重来
 
@@ -140,7 +149,7 @@ AI 在每个图形类的 `toTreeLine()` 里硬编码了一串空格来对齐（`
 
 根因是责任错位：对齐需要知道**同层所有兄弟**的标签宽度，这是文档层的信息，图形类各自看不到。
 
-重构：`Shape` 拆出 `treeLabel()` / `treeGeometry()` / `treeStyleAttributes()` / `treeDetail()`，`toTreeLine()` 由基类拼装；`SvgDocument.appendTree()` 先算同层最大标签宽度再统一补齐。顺带发现并删掉两处死代码：五个图形类里的 `showBody()` 无人调用，`SvgDocument.show()` 也无人调用（`ShowCommand` 自己重写了一份显示逻辑）。
+重构：`Shape` 拆出 `treeLabel()` / `treeGeometry()` / `treeStyleAttributes()` / `treeDetail()`，`toTreeLine()` 由基类拼装；`SvgDocument.appendTree()` 先算同层最大标签宽度再统一补齐。顺带发现并删掉两处死代码：五个图形类里的 `showBody()` 无人调用，`SvgDocument.show()` 也无人调用（`ShowCommand` 自己重写了一份显示逻辑）。终检时又发现 `show` 把样式挤在几何那一行，不符合作业 §5.2「几何一行、每个样式属性各占一行」的格式；于是把 `ShowCommand` 改成直接复用 `SvgDocument.show()`，重复实现和格式问题一并解决。
 
 ### 5.6 AI 给的提交计划过度设计，我砍掉一半
 
@@ -157,13 +166,21 @@ AI 在每个图形类的 `toTreeLine()` 里硬编码了一串空格来对齐（`
 
 两处都统一成 `error:` 前缀、单行、不带句号的风格。
 
+### 5.8 实现 `read` / `save` 时，依赖规则补了一条
+
+方案第一版只写了 `cli → commands → core / shapes` 和 `io → core / shapes`，没有给 `commands → io` 留位置。写 `ReadCommand` / `SaveCommand` 时绕不过去：命令要调用 reader / writer，把它俩改成由 `CommandFactory` 注入。
+
+两条路：把 `read` / `save` 提到 `cli` 层，或者承认 `commands → io`。选后者，因为把"读文件"这种语义硬塞进 REPL 会让 `cli` 变成第二套调度层。规则因此补了一条，并同时加了一条禁止项：**`io` 不许反向 import `commands`**，否则与这条一起成环。
+
+这也是为什么 `ReadCommand` / `SaveCommand` 对 `io` 用的是 `import type`——只依赖类型，不依赖具体实现，将来换掉 SVG 实现时这两个文件不用动。
+
 ## 6. 一致性自查
 
 ### 6.1 模块划分
 
 实际目录与方案一致：`src/cli`、`src/commands`、`src/core`、`src/shapes`、`src/io` 五个目录，`src/index.ts` 是程序入口，`src/runTranscript.ts` 是回放器。方案 §1 的表格与 plantuml 图未作修订。
 
-一处偏差：方案提到「`src/core` 不依赖 `cli`、`commands`、`io`」，实现时 `core` 内部多了一个 `IdRegistry`，是 §1 表格里「id 注册表」这一行的具体落地，属于方案内的细化，不算偏离。
+未见偏离。`core` 内部按 §1 表格里「id 注册表」这一行拆出了 `IdRegistry`，属于方案内的细化，不是新增职责。
 
 ### 6.2 依赖方向
 
@@ -199,11 +216,41 @@ SvgWriter.ts  → ../core/SvgDocument.js
 
 `io` → `core` / `shapes`，不反向依赖，符合方案。
 
-唯一允许的跨层依赖出现在 `commands` 与 `cli`：`ReadCommand` / `SaveCommand` 以 `import type` 引用 `io` 的 `SvgReader` / `SvgWriter`，`CommandFactory` 同理。这是「命令需要 IO 实现」的注入点，方向仍然是上层依赖下层，不构成反向依赖。
+`commands` 与 `io` 之间只有一处依赖：`ReadCommand` / `SaveCommand` 以 `import type` 引用 `SvgReader` / `SvgWriter`，`CommandFactory` 同理。方向是上层依赖下层的叶子模块，且 `io` 不反向引用 `commands`，不构成环——这条规则是 §5.8 记录的在实现中补充的一条，方案 §3 已同步更新。
+
+`cli` 与 `io` 之间的依赖同样只有一处：`Repl` 在构造时实例化 `SvgReader` / `SvgWriter` 并注入 `CommandFactory`，即组合根。除 `Repl.ts` 外，`src/cli/` 与 `src/index.ts` 不再引用 `io`。
+
+### 6.3 修订记录
+
+实现过程中对方案做过三处修订，都已同步到 §1–§3 的正文，不是"实现偷偷跑偏"：
+
+| 修订 | 落实到 | 原因 |
+|---|---|---|
+| 依赖方向新增 `commands → io`、`cli → io` | §3 允许清单 + 禁止 `io` 反引 `commands` | `read` / `save` 需要注入 reader / writer，见 §5.8 |
+| 模块细化：`core` 内拆出 `IdRegistry` | §1 表格「id 注册表」一行 | undo 需要区分"注销自身"与"递归注销"两种语义，见 §5.2 |
+| `Command` 增加 `kind`（edit / io / query） | §2 设计模式一节 | 文档类命令不得进 undo 栈，见 §5.3 |
+
+除此之外，§1 的模块表、§2 的模式选择、§4 的变化点假设与实现一致，未作修订。
 
 ## 7. 质量保证手段
 
-### 7.1 类型检查
+### 7.1 功能完整性对照
+
+按作业 §4 的命令总表逐条核对，19 条命令全部实现，无占位：
+
+| 命令 | 落地位置 | 状态 |
+|---|---|---|
+| `init` / `read` / `save` / `canvas` | `InitCommand` / `ReadCommand` / `SaveCommand` / `CanvasCommand` | ✅ |
+| `create`（含 `in` 子句、六种类型） | `CreateCommand` + `ShapeFactory` | ✅ |
+| `delete` / `move` / `scale` / `set` | `DeleteCommand` / `MoveCommand` / `ScaleCommand` / `SetCommand` | ✅ |
+| `group` / `ungroup` / `addto` | `GroupCommand` / `UngroupCommand` / `AddToCommand` | ✅ |
+| `front` / `back` | `ZOrderCommand` | ✅ |
+| `tree` / `show` / `help` | `TreeCommand` / `ShowCommand` / `HelpCommand` | ✅ |
+| `undo` / `redo` | `UndoCommand` / `RedoCommand` → `CommandInvoker` | ✅ |
+
+错误文案逐条对照过 §4.2，见 §7.4。
+
+### 7.2 类型检查
 
 ```powershell
 npm run build      # tsc --noEmit
@@ -211,7 +258,7 @@ npm run build      # tsc --noEmit
 
 无输出即通过。保证所有提交在类型层面自洽。
 
-### 7.2 脚本回放
+### 7.3 脚本回放
 
 ```powershell
 npm run replay fixtures/session1.txt
@@ -220,21 +267,28 @@ npm run replay fixtures/flowchart.txt
 
 `fixtures/session1.txt` 是作业文档 §6 的典型会话，`fixtures/flowchart.txt` 是 §6.1 的两节点流程图。回放器把每行命令喂给 REPL 并打印输出，可用来回归验证 undo/redo、错误文案、树形输出。
 
-### 7.3 手工会话
+### 7.4 手工会话
 
 用 `npm run cli` 手工敲过以下场景，逐条核对输出：
 
 - `init` / `read` / `save` / `canvas` 四条文档类命令，以及 io 锁定后 `undo` 被拒、下一条编辑命令后解禁
 - `group` / `ungroup` / `addto` 的父子关系往返，确认 undo 后子图形仍在原父容器的原位置
 - 容器与叶子的 `move` / `scale` 递归（嵌套两层同样生效）
-- 全部 §4.2 错误文案：`id already exists` / `no such shape` / `not a container` / `cannot ungroup top-level container` / `unknown attribute` / `unknown shape type` / `scale factor must be positive`
+- 全部 §4.2 错误文案：`id already exists: c1` / `no such shape: r9` / `no such container: node9` / `not a container: r1` / `cannot group a container into its own descendant` / `cannot ungroup top-level container: g1` / `unknown attribute: nope` / `unknown shape type: box` / `scale factor must be positive` / `cannot read file: nope.svg`
 - 失败命令不改变状态（报错后 `tree` 内容不变）
 
-### 7.4 渲染验证
+### 7.5 渲染验证
 
-`save` 出来的 `.svg` 用浏览器直接打开，确认图形位置、填充色、连线走向与 `tree` 输出一致。这是 IO 层正确性的唯一硬证据。
+`save` 出来的 `.svg` 用浏览器直接打开，确认图形位置、填充色、连线走向与 `tree` 输出一致。这是 IO 层正确性的唯一硬证据。`fixtures/transform.svg` 读入后摊平出的坐标（`rect#a` 为 `x=60 y=40`）与浏览器渲染同一文件的结果一致，可作为该方法的实例。
 
-### 7.5 依赖方向抽样
+已知限制（均不影响本阶段验收项）：
+
+- `<g transform>` 只支持 `translate` 与 `scale`，`rotate` / `matrix` / `skew` 会打 warning 并忽略；
+- `canvas` 改尺寸后不回显新尺寸（`init` 有回显）；
+- 未 `read` 过就 `save` 时错误为 `cannot write file: (no path)`，未按 §4.2 风格细化；
+- `box` 插件、拖拽编辑、多行文本属后续阶段。
+
+### 7.6 依赖方向抽样
 
 ```powershell
 Get-ChildItem src/core/*.ts | ForEach-Object { Select-String -Path $_.FullName -Pattern '^import' }
