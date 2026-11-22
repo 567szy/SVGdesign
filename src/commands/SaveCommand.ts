@@ -1,6 +1,7 @@
 import { writeFileSync } from "node:fs";
 import { EditorError } from "../core/EditorError.js";
 import type { Editor } from "../core/Editor.js";
+import type { SvgDocument } from "../core/SvgDocument.js";
 import type { SvgWriter } from "../io/SvgWriter.js";
 import type { Command } from "./Command.js";
 
@@ -11,7 +12,8 @@ export class SaveCommand implements Command {
   constructor(
     private readonly editor: Editor,
     private readonly writer: SvgWriter,
-    private readonly file?: string,
+    private readonly file: string | undefined,
+    private readonly onSaved: (document: SvgDocument) => string[],
   ) {}
 
   execute(): string {
@@ -26,7 +28,7 @@ export class SaveCommand implements Command {
       throw new EditorError(`cannot write file: ${path}`);
     }
     doc.sourcePath = path;
-    return `saved to ${path} (${doc.elementCount} elements)`;
+    return [`saved to ${path} (${doc.elementCount} elements)`, ...this.onSaved(doc)].join("\n");
   }
 
   undo(): string {

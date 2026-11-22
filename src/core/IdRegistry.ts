@@ -40,9 +40,21 @@ export class IdRegistry {
   }
 
   registerTree(shape: Shape): void {
-    this.register(shape);
-    for (const child of shape.children()) {
-      this.registerTree(child);
+    const pending = [shape];
+    const additions = new Map<string, Shape>();
+    while (pending.length) {
+      const node = pending.pop()!;
+      if (this.byId.has(node.id) || additions.has(node.id)) {
+        throw new EditorError(`id already exists: ${node.id}`);
+      }
+      additions.set(node.id, node);
+      const children = node.children();
+      for (let index = children.length - 1; index >= 0; index -= 1) {
+        pending.push(children[index]);
+      }
+    }
+    for (const [id, node] of additions) {
+      this.byId.set(id, node);
     }
   }
 

@@ -6,3 +6,8 @@ export interface Command {
   execute(): string;
   undo(): string;
 }
+
+export interface CommandRegistration {
+  readonly help: string;
+  create(args: string[]): Command;
+}

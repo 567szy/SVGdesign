@@ -23,10 +23,12 @@ export class UngroupCommand implements Command {
     if (!(shape instanceof Group)) {
       throw new EditorError(`not a container: ${this.gid}`);
     }
+    shape.assertCanUngroup();
     if (doc.isTopLevel(shape) || !shape.parent) {
       throw new EditorError(`cannot ungroup top-level container: ${this.gid}`);
     }
     const parent = shape.parent;
+    parent.assertCanRemoveChild(shape);
     this.group = shape;
     this.parent = parent;
     this.index = parent.indexOf(shape);

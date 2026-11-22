@@ -25,22 +25,24 @@ export class CommandInvoker {
 
   undo(): string {
     this.editor.assertUndoAllowed();
-    const command = this.undoStack.pop();
+    const command = this.undoStack.at(-1);
     if (!command) {
       throw new EditorError("nothing to undo");
     }
     const output = command.undo();
+    this.undoStack.pop();
     this.redoStack.push(command);
     return output;
   }
 
   redo(): string {
     this.editor.assertUndoAllowed();
-    const command = this.redoStack.pop();
+    const command = this.redoStack.at(-1);
     if (!command) {
       throw new EditorError("nothing to redo");
     }
     const output = command.execute();
+    this.redoStack.pop();
     this.undoStack.push(command);
     return output;
   }

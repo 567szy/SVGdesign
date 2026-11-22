@@ -1,29 +1,16 @@
 import * as readline from "node:readline";
-import { CommandFactory } from "../commands/CommandFactory.js";
-import { CommandInvoker } from "../commands/CommandInvoker.js";
-import { Editor } from "../core/Editor.js";
+import type { CommandFactory } from "../commands/CommandFactory.js";
+import type { CommandInvoker } from "../commands/CommandInvoker.js";
 import { EditorError } from "../core/EditorError.js";
-import { SvgReader } from "../io/SvgReader.js";
-import { SvgWriter } from "../io/SvgWriter.js";
-import { ShapeFactory } from "../shapes/ShapeFactory.js";
 import { LineParser } from "./LineParser.js";
 
 export class Repl {
-  private readonly editor = new Editor();
-  private readonly invoker = new CommandInvoker(this.editor);
   private readonly parser = new LineParser();
-  private readonly factory: CommandFactory;
 
-  constructor() {
-    const shapes = new ShapeFactory();
-    this.factory = new CommandFactory(
-      this.editor,
-      this.invoker,
-      shapes,
-      new SvgReader(shapes),
-      new SvgWriter(),
-    );
-  }
+  constructor(
+    private readonly factory: CommandFactory,
+    private readonly invoker: CommandInvoker,
+  ) {}
 
   start(): void {
     const rl = readline.createInterface({

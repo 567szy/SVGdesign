@@ -1,4 +1,10 @@
-import { Repl } from "./cli/Repl.js";
+import { parseArguments } from "./assembly/arguments.js";
+import { createApp } from "./assembly/createApp.js";
 
-const repl = new Repl();
-repl.start();
+try {
+  const { config } = parseArguments(process.argv.slice(2));
+  (await createApp(config)).start();
+} catch (error) {
+  console.error(error instanceof Error ? error.message : String(error));
+  process.exitCode = 1;
+}

@@ -26,6 +26,7 @@ export class GroupCommand implements Command {
     const doc = this.editor.requireDocument();
     const members = this.memberIds.map((id) => doc.ids.get(id));
     this.assertNoContainerWithDescendant(members);
+    for (const member of members) member.parent?.assertCanRemoveChild(member);
     this.locations = members.map((shape) => {
       const { parent, index } = doc.detach(shape);
       return { shape, parent, index };

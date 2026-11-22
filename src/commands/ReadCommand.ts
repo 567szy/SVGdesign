@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { EditorError } from "../core/EditorError.js";
 import type { Editor } from "../core/Editor.js";
+import type { SvgDocument } from "../core/SvgDocument.js";
 import type { SvgReader } from "../io/SvgReader.js";
 import type { Command } from "./Command.js";
 
@@ -12,6 +13,7 @@ export class ReadCommand implements Command {
     private readonly editor: Editor,
     private readonly reader: SvgReader,
     private readonly file: string,
+    private readonly onSaved: (document: SvgDocument) => string[],
   ) {}
 
   execute(): string {
@@ -25,7 +27,7 @@ export class ReadCommand implements Command {
     document.sourcePath = this.file;
     this.editor.replaceDocument(document);
     const summary = `read ${this.file} (${document.elementCount} elements)`;
-    return warnings.length > 0 ? `${warnings.join("\n")}\n${summary}` : summary;
+    return [...warnings, summary, ...this.onSaved(document)].join("\n");
   }
 
   undo(): string {

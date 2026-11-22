@@ -22,8 +22,8 @@ export class SvgDocument {
   }
 
   add(shape: Shape, containerId?: string, index?: number): void {
-    this.ids.registerTree(shape);
     const parent = containerId ? this.requireContainer(containerId) : undefined;
+    this.ids.registerTree(shape);
     this.attach(shape, parent, index);
   }
 
@@ -79,15 +79,15 @@ export class SvgDocument {
     return shape.parent === null && this.roots.includes(shape);
   }
 
-  toTree(rootId?: string): string {
+  toTree(rootId?: string, suffix: (shape?: Shape) => string = () => ""): string {
     if (!rootId) {
-      const lines = [`svg (${this.width}x${this.height})`];
-      this.appendTree(lines, this.roots, "");
+      const lines = [`svg (${this.width}x${this.height})${suffix()}`];
+      this.appendTree(lines, this.roots, "", suffix);
       return lines.join("\n");
     }
     const shape = this.ids.get(rootId);
-    const lines = [shape.toTreeLine()];
-    this.appendTree(lines, shape.children(), "");
+    const lines = [shape.toTreeLine() + suffix(shape)];
+    this.appendTree(lines, shape.children(), "", suffix);
     return lines.join("\n");
   }
 
@@ -116,16 +116,18 @@ export class SvgDocument {
     ].join("\n");
   }
 
-  private appendTree(lines: string[], shapes: Shape[], prefix: string): void {
+  private appendTree(
+    lines: string[], shapes: Shape[], prefix: string, suffix: (shape?: Shape) => string,
+  ): void {
     const width = shapes.reduce((max, shape) => Math.max(max, shape.treeLabel().length), 0) + 2;
     shapes.forEach((shape, index) => {
       const last = index === shapes.length - 1;
       const branch = last ? "└── " : "├── ";
       const detail = shape.treeDetail();
       const head = `${prefix}${branch}${shape.treeLabel().padEnd(width)}`;
-      lines.push(detail ? `${head}${detail}`.trimEnd() : head.trimEnd());
+      lines.push(`${head}${detail}`.trimEnd() + suffix(shape));
       const childPrefix = prefix + (last ? "    " : "│   ");
-      this.appendTree(lines, shape.children(), childPrefix);
+      this.appendTree(lines, shape.children(), childPrefix, suffix);
     });
   }
 }

@@ -38,6 +38,50 @@ VS Code 在打开 SVG 文本文档或编辑内容后请求文档符号。`SvgDoc
 
 检查 AI 初稿时发现，仅根据后缀无法区分名为 `*.svg` 的目录，因此增加了文件类型检查和同名后缀目录作为对照。实际点击大纲还发现，仅临时切换文本编辑器时，VS Code 可能在定位时重新选择图片预览。将编辑器关联限定在示例工作区后，点击定位成功。
 
+## Phase 2 · CLI 框架
+
+### 扩展点清单
+
+四项扩展的契约集中在 [Extensions.ts](../src/core/Extensions.ts) 和 [Command.ts](../src/commands/Command.ts)。当前框架默认注册 Phase 1 内置能力。测试替身验证了各接口，课程要求的可选插件将在后续过程节点接入。
+
+| 接口 | 职责与调用位置 | 实现与默认行为 | 契约错误 |
+| --- | --- | --- | --- |
+| `ShapeProvider` | `ShapeFactory.create` 负责分发创建，`SvgReader.toShape` 调用 `ShapeFactory.forRead` 选择读回提供者，装入子元素后调用可选的 `finishRead` | `src/builtins/shapes.ts` 注册原有六种类型。没有匹配的 `data-kind` 提供者时按 XML 标签解析 | 注册名须与提供者名称一致。没有匹配类型报 `unknown shape type`。创建或读回抛错时本次操作失败，读回失败保留当前文档 |
+| `Command` | `CommandFactory.create` 从注册表构造命令，`CommandInvoker.run` 执行。注册项提供参数解析和帮助文案 | `src/builtins/commands.ts` 注册 Phase 1 命令。未加载的命令不出现在 `help` | 未注册命令报 `unknown command`。工厂返回不同名称时报 `command name mismatch` |
+| `AttributeHandler` | `SetCommand.plan` 匹配目标和属性，并收集处理器需要修改的子树属性 | `test/framework.test.ts` 的两个命中处理器验证冲突。未命中时沿用图形的 `setAttribute` 白名单 | 多处理器命中报 `conflicting attribute handlers`，越出子树的写入被拒绝，计划或写入失败不进入历史 |
+| `TreeDecorator` | `TreeCommand.execute` 为画布和每个图形行询问标签，按装入顺序追加。`ReadCommand.execute` 和 `SaveCommand.execute` 成功时通知可选的保存点回调 | `test/framework.test.ts` 的标签替身验证两种 `tree` 入口。无标签时输出沿用 Phase 1 | 查询回调失败时显示 `tree decorator … failed`。保存点回调失败时继续报告已完成的读写及回调错误 |
+
+### 代码与配置装配
+
+代码装配在 [createApp.ts](../src/assembly/createApp.ts) 的 `codePlugins` 数组声明插件对象、其包清单和可选参数。不传 `--config` 时采用代码装配。配置装配通过以下命令从指定文件取代该数组，内置能力在两种装配中都先注册。
+
+```sh
+npm run cli -- --config plugins.config.json
+npm run replay -- --config plugins.config.json doc/transcript/cli-1.txt
+```
+
+配置包含 `plugins` 数组。每项需要 `module`，可选 `enabled` 和 `options`。数组顺序就是插件装入顺序。`enabled: false` 的项直接跳过。`options` 原样传给 `activate(context, options)`。相对路径以配置文件所在目录为基准，支持指定文件和带 `package.json` 入口的本地目录包。包名用 ESM 解析规则从配置所在位置解析。入口默认导出实现内核 `Plugin` 接口的对象。
+
+### ADR 1 · 属性修改计划与撤销
+
+处理器通过只读的 `AttributeTarget` 获取类型、id、属性和子部件。处理器同步提交写入计划，目标只能是这次调用提供的子树节点。无匹配时使用原有白名单。命中多个处理器即拒绝，避免装入顺序改变属性语义。处理器抛错时计划直接丢弃。
+
+只有计划成功才写入模型，同一条命令把每次写入的旧值按顺序记录。失败或撤销时逆序恢复，包含缺省样式属性原本不存在的情况。图形若提供可选自定义属性，须实现相应的 `restoreAttribute`，保证旧值可恢复。重做按 id 重新执行已验证过的计划，支持同 id 的图形经 `create` 重做后换成新对象。
+
+### ADR 2 · SVG 提供者选择与读回失败
+
+先查找与 `data-kind` 同名且支持当前 XML 标签的提供者，再按 XML 标签匹配内置或自定义提供者。例如，容器类型未安装时，带标记的 `g` 读作普通分组。容器提供者通过 `finishRead` 校验已经装入的子部件。若校验失败，拒绝整个读入以保留原文档。注册一个新增子树前，先完整检查树内和文档中的 id 冲突。
+
+### ADR 3 · 插件清单校验时机
+
+代码和配置装配都经过 [PluginLoader.load](../src/assembly/PluginLoader.ts)。先完成模块解析和求值，再把 `activate` 的注册放进临时注册表。随后按类别比较 `contributes` 中声明的名称集合和实际注册集合。只有激活完成、名称匹配且没有重复注册时才合并。这样失败插件的部分注册不会影响已装入的插件，后续插件可以继续装入。顶层解析与模块求值分开处理，已找到的插件缺少依赖时报告加载失败。
+
+### 框架验收
+
+- `npm test` 验证加载器故障和回滚、注册扩展点、属性写入和两种装配执行同一个测试命令。
+- `npm run regression` 从 `final` 提取基线源码和样例，在独立临时目录回放三份输入。对代码装配和空配置装配分别比较命令输出与生成的 SVG 文件，比较使用原始字节。
+- `npm run metrics -- final HEAD` 从 Git 历史生成运行源码清单、行数和圈复杂度。
+
 Lab1 Phase 1。实现语言：TypeScript + 面向对象。入口：`npm run cli`。
 
 ## 1. 模块划分

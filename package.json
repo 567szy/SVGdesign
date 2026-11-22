@@ -3,15 +3,21 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Lab1 Phase 1 — CLI SVG editor",
+  "description": "Lab1 — extensible CLI SVG editor",
   "scripts": {
     "cli": "tsx src/index.ts",
     "replay": "tsx src/runTranscript.ts",
-    "build": "tsc --noEmit"
+    "build": "tsc --noEmit",
+    "test": "node --import tsx --test test/*.test.ts",
+    "regression": "node scripts/regression.mjs",
+    "metrics": "node scripts/metrics.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2"
+  },
+  "dependencies": {
+    "import-meta-resolve": "^4.2.0"
   }
 }

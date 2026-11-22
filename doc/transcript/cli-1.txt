@@ -1,0 +1,43 @@
+# Phase 1 base commands, including subtrees, history, read and save.
+help
+tree
+undo
+init 800 600
+canvas
+canvas 640 480
+create rect bg 0 0 640 480 #ffffff
+create text title 20 40 "My Diagram"
+create circle c1 100 100 20 red
+create ellipse e1 200 200 50 30 blue
+create line l1 1 2 3 4 black
+create g outer
+create g inner in outer
+addto inner c1
+addto inner e1
+front c1
+back c1
+tree inner
+show c1
+ungroup inner
+undo
+redo
+group markers c1 e1
+move markers 30 0
+scale markers 2
+undo
+redo
+set title text "My Diagram v2"
+undo
+redo
+group bad c1 markers
+delete bg
+undo
+create rect x bad 0 1 1
+create rect x 0 0 1 1
+set x label unknown
+save baseline.svg
+undo
+read fixtures/other.svg
+tree
+read fixtures/transform.svg
+tree

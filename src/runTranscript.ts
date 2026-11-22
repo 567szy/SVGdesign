@@ -1,8 +1,9 @@
 import { readFileSync } from "node:fs";
-import { Repl } from "./cli/Repl.js";
+import { parseArguments } from "./assembly/arguments.js";
+import { createApp } from "./assembly/createApp.js";
 
-const file = process.argv[2];
-const repl = new Repl();
+const { config, files: [file] } = parseArguments(process.argv.slice(2));
+const repl = await createApp(config);
 const source = file ? readFileSync(file, "utf8") : readFileSync(0, "utf8");
 for (const line of source.split(/\r?\n/)) {
   const output = repl.evalLine(line);

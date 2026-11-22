@@ -30,6 +30,7 @@ export class Group extends Shape {
     if (index < 0) {
       throw new EditorError(`no such shape: ${shape.id}`);
     }
+    this.assertCanRemoveChild(shape);
     this._children.splice(index, 1);
     shape.setParent(null);
     return index;
@@ -37,11 +38,16 @@ export class Group extends Shape {
 
   takeChildren(): Shape[] {
     const all = [...this._children];
+    for (const child of all) this.assertCanRemoveChild(child);
     for (const child of all) {
       this.removeChild(child);
     }
     return all;
   }
+
+  assertCanRemoveChild(_shape: Shape): void {}
+
+  assertCanUngroup(): void {}
 
   indexOf(shape: Shape): number {
     return this._children.indexOf(shape);

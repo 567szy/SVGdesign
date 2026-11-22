@@ -1,7 +1,7 @@
 import type { Editor } from "../core/Editor.js";
 import type { Group } from "../core/Group.js";
 import type { Shape } from "../core/Shape.js";
-import { ShapeFactory } from "../shapes/ShapeFactory.js";
+import type { ShapeFactory } from "../shapes/ShapeFactory.js";
 import type { Command } from "./Command.js";
 
 export class CreateCommand implements Command {
@@ -20,12 +20,7 @@ export class CreateCommand implements Command {
 
   execute(): string {
     const doc = this.editor.requireDocument();
-    const shape = this.factory.create({
-      type: this.type,
-      id: this.id,
-      containerId: this.containerId,
-      rest: [...this.args],
-    });
+    const shape = this.factory.create(this.type, this.id, [...this.args]);
     doc.add(shape, this.containerId);
     this.created = shape;
     if (this.containerId) {

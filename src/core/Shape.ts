@@ -22,6 +22,10 @@ export abstract class Shape {
 
   abstract get tagName(): string;
 
+  get type(): string {
+    return this.tagName;
+  }
+
   isContainer(): boolean {
     return false;
   }
@@ -45,6 +49,16 @@ export abstract class Shape {
       return this.strokeWidth;
     }
     return undefined;
+  }
+
+  restoreAttribute(attr: string, value: string | undefined): void {
+    if (value !== undefined) {
+      this.setAttribute(attr, value);
+      return;
+    }
+    if (attr === "fill") this.fill = undefined;
+    if (attr === "stroke") this.stroke = undefined;
+    if (attr === "stroke-width") this.strokeWidth = undefined;
   }
   treeLabel(): string {
     return `${this.tagName}#${this.id}`;

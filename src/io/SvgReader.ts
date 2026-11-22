@@ -2,7 +2,7 @@ import { EditorError } from "../core/EditorError.js";
 import { Group } from "../core/Group.js";
 import { SvgDocument } from "../core/SvgDocument.js";
 import type { Shape } from "../core/Shape.js";
-import { ShapeFactory } from "../shapes/ShapeFactory.js";
+import type { ShapeFactory } from "../shapes/ShapeFactory.js";
 import { findUnsupportedTransforms, parseTransform } from "./Transform.js";
 
 interface XmlNode {
@@ -52,14 +52,15 @@ export class SvgReader {
     document: SvgDocument,
     warnings: string[],
     transformed: { shape: Shape; dx: number; dy: number; scale: number }[],
-  ): ReturnType<ShapeFactory["fromTag"]> {
+  ): Shape {
     let id = node.attrs.id;
     if (!id) {
       id = document.ids.assignMissingId(node.tag);
       warnings.push(`warning: assigned id ${id} to unnamed <${node.tag}>`);
     }
-    const shape = this.factory.fromTag(node.tag, id, node.attrs, node.text);
-    if (node.attrs.stroke && shape.tagName !== "line") {
+    const provider = this.factory.forRead(node.tag, node.attrs["data-kind"]);
+    const shape = provider.read(id, node.attrs, node.text);
+    if (node.attrs.stroke && shape.getAttribute("stroke") !== node.attrs.stroke) {
       try {
         shape.setAttribute("stroke", node.attrs.stroke);
       } catch {
@@ -86,6 +87,7 @@ export class SvgReader {
         warnings.push(`warning: unsupported transform ignored on <${node.tag}>: ${name}`);
       }
     }
+    provider.finishRead?.(shape);
     return shape;
   }
 
