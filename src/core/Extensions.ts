@@ -18,12 +18,17 @@ export interface AttributeTarget {
   getAttribute(attribute: string): string | undefined;
 }
 
+export interface AttributeMessages {
+  readonly applied: string;
+  readonly undone: string;
+}
+
 export interface AttributeHandler {
   handles(target: AttributeTarget, attribute: string): boolean;
   apply(
     target: AttributeTarget, attribute: string, value: string,
     set: (target: AttributeTarget, attribute: string, value: string) => void,
-  ): void;
+  ): void | AttributeMessages;
 }
 
 export interface TreeDecorator {

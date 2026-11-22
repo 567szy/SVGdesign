@@ -1,6 +1,6 @@
 import type { Editor } from "../core/Editor.js";
 import { EditorError } from "../core/EditorError.js";
-import type { AttributeHandler, AttributeTarget } from "../core/Extensions.js";
+import type { AttributeHandler, AttributeMessages, AttributeTarget } from "../core/Extensions.js";
 import type { Shape } from "../core/Shape.js";
 import type { SvgDocument } from "../core/SvgDocument.js";
 import type { Command } from "./Command.js";
@@ -15,11 +15,16 @@ interface AppliedWrite extends Write {
   previous?: string;
 }
 
+interface Plan {
+  writes: Write[];
+  messages: AttributeMessages | undefined;
+}
+
 export class SetCommand implements Command {
   readonly name = "set";
   readonly kind = "edit" as const;
   private previous = "";
-  private planned?: Write[];
+  private planned?: Plan;
   private applied: AppliedWrite[] = [];
 
   constructor(
@@ -35,14 +40,14 @@ export class SetCommand implements Command {
     const shape = doc.ids.get(this.id);
     const planned = this.planned ?? this.plan(shape);
     if (planned) {
-      this.applied = this.apply(doc, planned);
+      this.applied = this.apply(doc, planned.writes);
       this.planned = planned;
       this.previous = this.applied[0]?.previous ?? "";
     } else {
       this.previous = shape.getAttribute(this.attr) ?? "";
       shape.setAttribute(this.attr, this.value);
     }
-    return this.summary(shape, this.value);
+    return planned?.messages?.applied ?? this.summary(shape, this.value);
   }
 
   undo(): string {
@@ -53,10 +58,10 @@ export class SetCommand implements Command {
     } else {
       shape.setAttribute(this.attr, this.previous);
     }
-    return this.summary(shape, this.previous);
+    return this.planned?.messages?.undone ?? this.summary(shape, this.previous);
   }
 
-  private plan(shape: Shape): Write[] | undefined {
+  private plan(shape: Shape): Plan | undefined {
     if (this.handlers.size === 0) return;
     const targets = new Map<AttributeTarget, string>();
     const view = (node: Shape): AttributeTarget => {
@@ -75,12 +80,12 @@ export class SetCommand implements Command {
     if (matches.length > 1) throw new EditorError(`conflicting attribute handlers: ${this.attr}`);
 
     const writes: Write[] = [];
-    matches[0].apply(target, this.attr, this.value, (destination, attribute, value) => {
+    const messages = matches[0].apply(target, this.attr, this.value, (destination, attribute, value) => {
       const id = targets.get(destination);
       if (id === undefined) throw new EditorError("attribute handler target is outside the selected shape");
       writes.push({ id, attribute, value });
     });
-    return [...writes];
+    return { writes: [...writes], messages: messages ? { ...messages } : undefined };
   }
 
   private apply(document: SvgDocument, writes: Write[]): AppliedWrite[] {

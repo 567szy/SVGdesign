@@ -25,7 +25,7 @@ export class MoveCommand implements Command {
     shape.move(this.dx, this.dy);
     this.afterLabel = this.describe(shape);
     if (shape.isContainer()) {
-      return `g#${shape.id} moved by (${this.dx},${this.dy})`;
+      return `${shape.type}#${shape.id} moved by (${this.dx},${this.dy})`;
     }
     return `${shape.tagName}#${shape.id} moved to ${this.afterLabel}`;
   }
@@ -35,7 +35,7 @@ export class MoveCommand implements Command {
     const shape = doc.ids.get(this.id);
     shape.move(-this.dx, -this.dy);
     if (shape.isContainer()) {
-      return `g#${shape.id} moved back by (${-this.dx},${-this.dy})`;
+      return `${shape.type}#${shape.id} moved back by (${-this.dx},${-this.dy})`;
     }
     return `${shape.tagName}#${shape.id} moved back to ${this.beforeLabel}`;
   }

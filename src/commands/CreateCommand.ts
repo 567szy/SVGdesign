@@ -23,10 +23,7 @@ export class CreateCommand implements Command {
     const shape = this.factory.create(this.type, this.id, [...this.args]);
     doc.add(shape, this.containerId);
     this.created = shape;
-    if (this.containerId) {
-      return `${shape.tagName}#${shape.id} created in g#${this.containerId}`;
-    }
-    return `${shape.tagName}#${shape.id} created`;
+    return shape.describeCreation(this.containerId);
   }
 
   undo(): string {
@@ -36,7 +33,7 @@ export class CreateCommand implements Command {
     const doc = this.editor.requireDocument();
     doc.delete(this.created);
     const id = this.created.id;
-    const tag = this.created.tagName;
+    const tag = this.created.type;
     this.created = undefined;
     return `${tag}#${id} deleted`;
   }

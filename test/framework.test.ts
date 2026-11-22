@@ -61,7 +61,9 @@ test("a shape provider creates and reads a marked SVG element; missing provider 
   });
   assert.deepEqual(app.errors, []);
   app.repl.evalLine("init");
-  assert.equal(app.repl.evalLine("create custom x"), "g#x created");
+  assert.equal(app.repl.evalLine("create custom x"), "custom#x created");
+  assert.equal(app.repl.evalLine("move x 2 3"), "custom#x moved by (2,3)");
+  assert.equal(app.repl.evalLine("undo"), "custom#x moved back by (-2,-3)");
   assert.equal(app.repl.evalLine("tree x"), "g#x (custom)");
   assert.equal(app.repl.evalLine("tree"), "svg (800x600)\n└── g#x (custom)");
   const xml = '<svg><g id="x" data-kind="custom"><g id="y"/></g></svg>';

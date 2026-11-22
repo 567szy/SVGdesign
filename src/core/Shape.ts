@@ -26,6 +26,11 @@ export abstract class Shape {
     return this.tagName;
   }
 
+  describeCreation(containerId?: string): string {
+    const created = `${this.type}#${this.id} created`;
+    return containerId ? `${created} in g#${containerId}` : created;
+  }
+
   isContainer(): boolean {
     return false;
   }
