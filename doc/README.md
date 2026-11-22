@@ -46,10 +46,10 @@ VS Code 在打开 SVG 文本文档或编辑内容后请求文档符号。`SvgDoc
 
 | 接口 | 职责与调用位置 | 实现与默认行为 | 契约错误 |
 | --- | --- | --- | --- |
-| `ShapeProvider` | `ShapeFactory.create` 负责分发创建，`SvgReader.toShape` 调用 `ShapeFactory.forRead` 选择读回提供者，装入子元素后调用可选的 `finishRead` | `src/builtins/shapes.ts` 注册原有六种类型。没有匹配的 `data-kind` 提供者时按 XML 标签解析 | 注册名须与提供者名称一致。没有匹配类型报 `unknown shape type`。创建或读回抛错时本次操作失败，读回失败保留当前文档 |
+| `ShapeProvider` | `ShapeFactory.create` 负责分发创建，`SvgReader.toShape` 调用 `ShapeFactory.forRead` 选择读回提供者，装入子元素后调用可选的 `finishRead` | `src/builtins/shapes.ts` 注册原有六种类型，`plugins/box` 注册 `BoxProvider`。没有匹配的 `data-kind` 提供者时按 XML 标签解析 | 注册名须与提供者名称一致。没有匹配类型报 `unknown shape type`。创建或读回抛错时本次操作失败，读回失败保留当前文档 |
 | `Command` | `CommandFactory.create` 从注册表构造命令，`CommandInvoker.run` 执行。注册项提供参数解析和帮助文案 | `src/builtins/commands.ts` 注册 Phase 1 命令，`plugins/stats` 与 `plugins/dir` 各注册一个查询命令。未加载的命令不出现在 `help` | 未注册命令报 `unknown command`。工厂返回不同名称时报 `command name mismatch` |
-| `AttributeHandler` | `SetCommand.plan` 匹配目标和属性，并收集处理器需要修改的子树属性 | `test/framework.test.ts` 的两个命中处理器验证冲突。未命中时沿用图形的 `setAttribute` 白名单 | 多处理器命中报 `conflicting attribute handlers`，越出子树的写入被拒绝，计划或写入失败不进入历史 |
-| `TreeDecorator` | `TreeCommand.execute` 为画布和每个图形行询问标签，按装入顺序追加。`ReadCommand.execute` 和 `SaveCommand.execute` 成功时通知可选的保存点回调 | `test/framework.test.ts` 的标签替身验证两种 `tree` 入口。无标签时输出沿用 Phase 1 | 查询回调失败时显示 `tree decorator … failed`。保存点回调失败时继续报告已完成的读写及回调错误 |
+| `AttributeHandler` | `SetCommand.plan` 匹配目标和属性，并收集处理器需要修改的子树属性 | `BoxAttributeHandler` 处理 box 的 `fill` 和 `label`。未命中时沿用图形的 `setAttribute` 白名单 | 多处理器命中报 `conflicting attribute handlers`，越出子树的写入被拒绝，计划或写入失败不进入历史 |
+| `TreeDecorator` | `TreeCommand.execute` 为画布和每个图形行询问标签，按装入顺序追加。`ReadCommand.execute` 和 `SaveCommand.execute` 成功时通知可选的保存点回调 | `BoxTypeLabel` 为 box 追加 `(box)`。无标签时输出沿用 Phase 1 | 查询回调失败时显示 `tree decorator … failed`。保存点回调失败时继续报告已完成的读写及回调错误 |
 
 ### 代码与配置装配
 
@@ -72,11 +72,26 @@ npm run replay -- --config plugins.config.json doc/transcript/cli-1.txt
 
 根配置文件和代码装配默认启用两条命令。配置中可用 `enabled: false` 分别禁用。只运行内置能力时，代码装配读 `SVG_EDITOR_BUILTINS_ONLY=1`，配置装配可用空的 `plugins` 数组。测试在内容固定的临时目录内使用真实适配器，将 [新增命令会话](transcript/cli-commands.txt) 的两种装配输出逐字节比较，并对照 [预期输出](transcript/cli-commands.expected.txt)。
 
+### Box 图形插件
+
+`create box` 创建一个带蓝色矩形和文本标题的容器。标题模板取 `x + width/8` 和 `y + height/2 + 5`，使 160×60 的课程样例得到横向 20、纵向 35 的偏移。复用图形领域模型中的 `Group`、`Rect` 和 `Text`。插件提供 `BoxProvider`、属性处理器和 `(box)` 标签，由同一份包清单声明。
+
+矩形和标题使用派生的 `<id>-rect`、`<id>-label`。它们分别是直接子部件，不能单独移出或删除。`ungroup` 拒绝拆开 box。可以移动、删除整个 box，也可以嵌套其它图形。读回时若缺少任一必要子部件或其类型错误，整个读入失败。未安装插件时按普通 `g` 读回，保留子图形和几何属性。
+
+共同基线 `2a765e1` 提供通用的创建提示和属性事务提示接口。之后从同一基线独立接入 box。
+
+| 装配方式 | 提交 | 验收差异 |
+| --- | --- | --- |
+| 代码 | `22eb9e5` | 新增 `plugins/box`，既有运行代码仅改 `src/assembly/createApp.ts`，另附测试、会话和预期 SVG |
+| 配置 | `af0cb45` | 新增相同的 `plugins/box`，仅修改 `plugins.config.json` |
+
+两条提交分别由 `git archive` 提取到临时目录，用同一工作目录和 [课程版本 B 会话](transcript/cli-box.txt) 回放。命令输出和 SVG 均逐字节相同，并匹配 [预期输出](transcript/cli-box.expected.txt) 与 [预期 SVG](../fixtures/flowchart-box.expected.svg)。结构树沿用 Phase 1 的列宽和样式属性显示，因此连接线行保留 `stroke=black`。两条提交排除 box 包后，内核、加载器和既有插件的差异为空。
+
 ### ADR 1 · 属性修改计划与撤销
 
 处理器通过只读的 `AttributeTarget` 获取类型、id、属性和子部件。处理器同步提交写入计划，目标只能是这次调用提供的子树节点。无匹配时使用原有白名单。命中多个处理器即拒绝，避免装入顺序改变属性语义。处理器抛错时计划直接丢弃。
 
-只有计划成功才写入模型，同一条命令把每次写入的旧值按顺序记录。失败或撤销时逆序恢复，包含缺省样式属性原本不存在的情况。图形若提供可选自定义属性，须实现相应的 `restoreAttribute`，保证旧值可恢复。重做按 id 重新执行已验证过的计划，支持同 id 的图形经 `create` 重做后换成新对象。
+只有计划成功才写入模型，同一条命令把每次写入的旧值按顺序记录。失败或撤销时逆序恢复，包含缺省样式属性原本不存在的情况。图形若提供可选自定义属性，须实现相应的 `restoreAttribute`，保证旧值可恢复。处理器可以随计划返回执行和撤销提示，提示只在相应操作完成后输出。重做按 id 重新执行已验证过的计划，支持同 id 的图形经 `create` 重做后换成新对象。
 
 ### ADR 2 · SVG 提供者选择与读回失败
 
