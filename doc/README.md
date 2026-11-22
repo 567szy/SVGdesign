@@ -49,7 +49,7 @@ VS Code 在打开 SVG 文本文档或编辑内容后请求文档符号。`SvgDoc
 | `ShapeProvider` | `ShapeFactory.create` 负责分发创建，`SvgReader.toShape` 调用 `ShapeFactory.forRead` 选择读回提供者，装入子元素后调用可选的 `finishRead` | `src/builtins/shapes.ts` 注册原有六种类型，`plugins/box` 注册 `BoxProvider`。没有匹配的 `data-kind` 提供者时按 XML 标签解析 | 注册名须与提供者名称一致。没有匹配类型报 `unknown shape type`。创建或读回抛错时本次操作失败，读回失败保留当前文档 |
 | `Command` | `CommandFactory.create` 从注册表构造命令，`CommandInvoker.run` 执行。注册项提供参数解析和帮助文案 | `src/builtins/commands.ts` 注册 Phase 1 命令，`plugins/stats` 与 `plugins/dir` 各注册一个查询命令。未加载的命令不出现在 `help` | 未注册命令报 `unknown command`。工厂返回不同名称时报 `command name mismatch` |
 | `AttributeHandler` | `SetCommand.plan` 匹配目标和属性，并收集处理器需要修改的子树属性 | `BoxAttributeHandler` 处理 box 的 `fill` 和 `label`。未命中时沿用图形的 `setAttribute` 白名单 | 多处理器命中报 `conflicting attribute handlers`，越出子树的写入被拒绝，计划或写入失败不进入历史 |
-| `TreeDecorator` | `TreeCommand.execute` 为画布和每个图形行询问标签，按装入顺序追加。`ReadCommand.execute` 和 `SaveCommand.execute` 成功时通知可选的保存点回调 | `BoxTypeLabel` 为 box 追加 `(box)`。无标签时输出沿用 Phase 1 | 查询回调失败时显示 `tree decorator … failed`。保存点回调失败时继续报告已完成的读写及回调错误 |
+| `TreeDecorator` | `TreeCommand.execute` 为画布和每个图形行询问标签，按装入顺序追加。`ReadCommand.execute` 和 `SaveCommand.execute` 成功时通知可选的保存点回调 | `BoxTypeLabel` 为 box 追加 `(box)`。`ModifiedStar` 为未保存的内容追加 `*`。无标签时输出沿用 Phase 1 | 查询回调失败时显示 `tree decorator … failed`。保存点回调失败时继续报告已完成的读写及回调错误 |
 
 ### 代码与配置装配
 
@@ -100,6 +100,12 @@ npm run replay -- --config plugins.config.json doc/transcript/cli-1.txt
 ### ADR 3 · 插件清单校验时机
 
 代码和配置装配都经过 [PluginLoader.load](../src/assembly/PluginLoader.ts)。先完成模块解析和求值，再把 `activate` 的注册放进临时注册表。随后按类别比较 `contributes` 中声明的名称集合和实际注册集合。只有激活完成、名称匹配且没有重复注册时才合并。这样失败插件的部分注册不会影响已装入的插件，后续插件可以继续装入。顶层解析与模块求值分开处理，已找到的插件缺少依赖时报告加载失败。
+
+### ADR 4 · 未保存标记与标签顺序
+
+`ModifiedStar` 在插件实例的 `WeakMap` 中保存每个文档的检查点。成功读取或保存后更新检查点。画布行比较当前序列化内容，图形行比较自己的类型、显示内容、父节点和直接子节点顺序。回到相同内容时清掉对应星号，新建节点立即标记。
+
+子节点的属性变化只标记它自己和画布行。容器直接子节点被添加、删除或重排时，容器本身也标记。画布行表示整个文档是否有未保存变化。标签按注册顺序用空格拼接，默认 box 类型标签在前，因此同一行可以显示 `g#n1 (box) *`。两种标签各自实现，无需访问对方的状态。
 
 ### 框架验收
 

@@ -1,3 +1,11 @@
+import box from "../../plugins/box/index.js";
+import boxManifest from "../../plugins/box/package.json" with { type: "json" };
+import dir from "../../plugins/dir/index.js";
+import dirManifest from "../../plugins/dir/package.json" with { type: "json" };
+import modifiedStar from "../../plugins/modified-star/index.js";
+import modifiedStarManifest from "../../plugins/modified-star/package.json" with { type: "json" };
+import stats from "../../plugins/stats/index.js";
+import statsManifest from "../../plugins/stats/package.json" with { type: "json" };
 import { registerBuiltinCommands } from "../builtins/commands.js";
 import { registerBuiltinShapes } from "../builtins/shapes.js";
 import { Repl } from "../cli/Repl.js";
@@ -14,6 +22,7 @@ const codePlugins: readonly PluginPackage[] = [
   { manifest: statsManifest, plugin: stats },
   { manifest: dirManifest, plugin: dir },
   { manifest: boxManifest, plugin: box },
+  { manifest: modifiedStarManifest, plugin: modifiedStar },
 ];
 
 export async function createApp(config?: string, report = console.log): Promise<Repl> {
@@ -32,9 +41,3 @@ export async function createApp(config?: string, report = console.log): Promise<
   }
   return new Repl(new CommandFactory(extensions.commands), invoker);
 }
-import dir from "../../plugins/dir/index.js";
-import dirManifest from "../../plugins/dir/package.json" with { type: "json" };
-import stats from "../../plugins/stats/index.js";
-import statsManifest from "../../plugins/stats/package.json" with { type: "json" };
-import box from "../../plugins/box/index.js";
-import boxManifest from "../../plugins/box/package.json" with { type: "json" };

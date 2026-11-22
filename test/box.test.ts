@@ -92,7 +92,9 @@ test("box nesting, protected parts, and subtree collisions leave the document co
 test("marked SVG round-trips, degrades without box, and rejects malformed boxes or duplicate ids", async (t) => {
   const directory = temporaryDirectory(t);
   const file = join(directory, "box.svg");
-  const app = await createApp();
+  const boxConfig = join(directory, "box-only.json");
+  writeFileSync(boxConfig, JSON.stringify({ plugins: [{ module: fileURLToPath(new URL("plugins/box/", repo)) }] }));
+  const app = await createApp(boxConfig);
   const run = (line: string) => app.evalLine(line);
   run("init");
   run('create box x 0 0 100 60 "Label"');
@@ -124,10 +126,7 @@ test("marked SVG round-trips, degrades without box, and rejects malformed boxes 
 
 test("Phase 1 version B session produces identical output and SVG with either assembly", (t) => {
   const directory = temporaryDirectory(t);
-  const config = join(directory, "box.config.json");
-  writeFileSync(config, JSON.stringify({ plugins: ["stats", "dir", "box"].map((name) => ({
-    module: fileURLToPath(new URL(`plugins/${name}/`, repo)),
-  })) }));
+  const config = fileURLToPath(new URL("plugins.config.json", repo));
   const entry = fileURLToPath(new URL("src/runTranscript.ts", repo));
   const tsx = createRequire(import.meta.url).resolve("tsx/cli");
   const input = readFileSync(new URL("doc/transcript/cli-box.txt", repo));
@@ -141,6 +140,6 @@ test("Phase 1 version B session produces identical output and SVG with either as
   };
   const code = run([]);
   assert.deepEqual(run(["--config", config]), code);
-  assert.equal(code[0].toString(), expected);
+  assert.equal(code[0].toString().replace(/ \*$/gm, ""), expected);
   assert.equal(code[1].toString(), expectedSvg);
 });
