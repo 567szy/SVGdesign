@@ -1,0 +1,61 @@
+# Run with a fixed current directory and the command plugins enabled.
+svg> dir
+[DIR]  nested
+[FILE]  .env
+[FILE]  regular
+svg> help
+init [w] [h]
+read <file.svg>
+save [file.svg]
+canvas [w] [h]
+create <type> <id> [params…] [in <containerId>]
+delete <id>
+move <id> <dx> <dy>
+scale <id> <factor>
+set <id> <attr> <value>
+group <newGid> <id1> <id2>…
+ungroup <gid>
+addto <gid> <id>
+front <id>
+back <id>
+tree [id]
+show <id>
+undo
+redo
+help
+stats
+dir
+svg> stats
+error: no document. use 'init' or 'read' first
+svg> init
+canvas 800x600 created
+svg> stats
+(total 0, containers 0)
+svg> create g layer
+g#layer created
+svg> create text title 4 9 "Start" in layer
+text#title created in g#layer
+svg> create rect background 0 0 30 30
+rect#background created
+svg> create circle dot 10 10 4 in layer
+circle#dot created in g#layer
+svg> stats
+text: 1  circle: 1  rect: 1  (total 3, containers 1)
+svg> dir
+[DIR]  nested
+[FILE]  .env
+[FILE]  regular
+svg> undo
+circle#dot deleted
+svg> stats
+text: 1  rect: 1  (total 2, containers 1)
+svg> dir
+[DIR]  nested
+[FILE]  .env
+[FILE]  regular
+svg> redo
+circle#dot created in g#layer
+svg> stats
+text: 1  circle: 1  rect: 1  (total 3, containers 1)
+svg> dir unexpected
+error: usage: dir

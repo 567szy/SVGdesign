@@ -10,7 +10,10 @@ import { SvgWriter } from "../io/SvgWriter.js";
 import { ShapeFactory } from "../shapes/ShapeFactory.js";
 import { PluginLoader, type PluginPackage } from "./PluginLoader.js";
 
-const codePlugins: readonly PluginPackage[] = [];
+const codePlugins: readonly PluginPackage[] = [
+  { manifest: statsManifest, plugin: stats },
+  { manifest: dirManifest, plugin: dir },
+];
 
 export async function createApp(config?: string, report = console.log): Promise<Repl> {
   const editor = new Editor();
@@ -21,10 +24,14 @@ export async function createApp(config?: string, report = console.log): Promise<
   registerBuiltinCommands(extensions, editor, invoker, shapes, new SvgReader(shapes), new SvgWriter());
 
   const loader = new PluginLoader(extensions, editor, report);
-  if (config === undefined) {
-    for (const plugin of codePlugins) await loader.load(plugin);
-  } else {
+  if (config !== undefined) {
     await loader.loadConfig(config);
+  } else if (process.env.SVG_EDITOR_BUILTINS_ONLY !== "1") {
+    for (const plugin of codePlugins) await loader.load(plugin);
   }
   return new Repl(new CommandFactory(extensions.commands), invoker);
 }
+import dir from "../../plugins/dir/index.js";
+import dirManifest from "../../plugins/dir/package.json" with { type: "json" };
+import stats from "../../plugins/stats/index.js";
+import statsManifest from "../../plugins/stats/package.json" with { type: "json" };

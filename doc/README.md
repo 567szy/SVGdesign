@@ -42,12 +42,12 @@ VS Code 在打开 SVG 文本文档或编辑内容后请求文档符号。`SvgDoc
 
 ### 扩展点清单
 
-四项扩展的契约集中在 [Extensions.ts](../src/core/Extensions.ts) 和 [Command.ts](../src/commands/Command.ts)。当前框架默认注册 Phase 1 内置能力。测试替身验证了各接口，课程要求的可选插件将在后续过程节点接入。
+四项扩展的契约集中在 [Extensions.ts](../src/core/Extensions.ts) 和 [Command.ts](../src/commands/Command.ts)。框架始终注册 Phase 1 内置能力，按装配选择加载可选插件。
 
 | 接口 | 职责与调用位置 | 实现与默认行为 | 契约错误 |
 | --- | --- | --- | --- |
 | `ShapeProvider` | `ShapeFactory.create` 负责分发创建，`SvgReader.toShape` 调用 `ShapeFactory.forRead` 选择读回提供者，装入子元素后调用可选的 `finishRead` | `src/builtins/shapes.ts` 注册原有六种类型。没有匹配的 `data-kind` 提供者时按 XML 标签解析 | 注册名须与提供者名称一致。没有匹配类型报 `unknown shape type`。创建或读回抛错时本次操作失败，读回失败保留当前文档 |
-| `Command` | `CommandFactory.create` 从注册表构造命令，`CommandInvoker.run` 执行。注册项提供参数解析和帮助文案 | `src/builtins/commands.ts` 注册 Phase 1 命令。未加载的命令不出现在 `help` | 未注册命令报 `unknown command`。工厂返回不同名称时报 `command name mismatch` |
+| `Command` | `CommandFactory.create` 从注册表构造命令，`CommandInvoker.run` 执行。注册项提供参数解析和帮助文案 | `src/builtins/commands.ts` 注册 Phase 1 命令，`plugins/stats` 与 `plugins/dir` 各注册一个查询命令。未加载的命令不出现在 `help` | 未注册命令报 `unknown command`。工厂返回不同名称时报 `command name mismatch` |
 | `AttributeHandler` | `SetCommand.plan` 匹配目标和属性，并收集处理器需要修改的子树属性 | `test/framework.test.ts` 的两个命中处理器验证冲突。未命中时沿用图形的 `setAttribute` 白名单 | 多处理器命中报 `conflicting attribute handlers`，越出子树的写入被拒绝，计划或写入失败不进入历史 |
 | `TreeDecorator` | `TreeCommand.execute` 为画布和每个图形行询问标签，按装入顺序追加。`ReadCommand.execute` 和 `SaveCommand.execute` 成功时通知可选的保存点回调 | `test/framework.test.ts` 的标签替身验证两种 `tree` 入口。无标签时输出沿用 Phase 1 | 查询回调失败时显示 `tree decorator … failed`。保存点回调失败时继续报告已完成的读写及回调错误 |
 
@@ -61,6 +61,16 @@ npm run replay -- --config plugins.config.json doc/transcript/cli-1.txt
 ```
 
 配置包含 `plugins` 数组。每项需要 `module`，可选 `enabled` 和 `options`。数组顺序就是插件装入顺序。`enabled: false` 的项直接跳过。`options` 原样传给 `activate(context, options)`。相对路径以配置文件所在目录为基准，支持指定文件和带 `package.json` 入口的本地目录包。包名用 ESM 解析规则从配置所在位置解析。入口默认导出实现内核 `Plugin` 接口的对象。
+
+### 命令插件与目录访问适配器
+
+`stats` 从画布子节点按顺序深度优先遍历。叶子按首次遇到的类型顺序输出，容器只计入 `containers`，同时继续遍历其子节点。两条新增命令都是查询，不写入撤销历史。
+
+`DirCommand` 是使用者，面向目标接口 `DirectoryAccess`。被适配者是 Node.js 的 `process.cwd` 与 `fs.readdirSync`，由 `NodeDirectoryAccess` 转换成命令所需的当前路径和直接子项。测试可以用替身提供同一接口。插件包的同一个入口用于代码与配置装配，两种方式都使用这个适配器。
+
+`dir` 总是查看进程工作目录，因此可以在初始化画布前运行，读写 SVG 文件也不会切换目标目录。目录排在前面，各组按区分大小写的字符串顺序排列。隐藏项照常显示。符号链接和其他特殊项按 `[FILE]` 显示，不跟随目标。
+
+根配置文件和代码装配默认启用两条命令。配置中可用 `enabled: false` 分别禁用。只运行内置能力时，代码装配读 `SVG_EDITOR_BUILTINS_ONLY=1`，配置装配可用空的 `plugins` 数组。测试在内容固定的临时目录内使用真实适配器，将 [新增命令会话](transcript/cli-commands.txt) 的两种装配输出逐字节比较，并对照 [预期输出](transcript/cli-commands.expected.txt)。
 
 ### ADR 1 · 属性修改计划与撤销
 

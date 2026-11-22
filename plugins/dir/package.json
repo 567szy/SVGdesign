@@ -1,0 +1,7 @@
+{
+  "name": "@svgframe/plugin-dir",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "index.ts",
+  "contributes": { "commands": ["dir"] }
+}

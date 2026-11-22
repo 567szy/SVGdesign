@@ -1,0 +1,18 @@
+# Run with a fixed current directory and the command plugins enabled.
+dir
+help
+stats
+init
+stats
+create g layer
+create text title 4 9 "Start" in layer
+create rect background 0 0 30 30
+create circle dot 10 10 4 in layer
+stats
+dir
+undo
+stats
+dir
+redo
+stats
+dir unexpected

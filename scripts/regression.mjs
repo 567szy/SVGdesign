@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -18,7 +18,9 @@ const sessions = [
 ];
 
 function replay(entry, cwd, input, args = []) {
-  return execFileSync(process.execPath, [tsx, entry, ...args], { cwd, input });
+  return execFileSync(process.execPath, [tsx, entry, ...args], {
+    cwd, input, env: { ...process.env, SVG_EDITOR_BUILTINS_ONLY: "1" },
+  });
 }
 
 try {
@@ -29,7 +31,9 @@ try {
   cpSync(join(baseline, "fixtures"), join(current, "fixtures"), { recursive: true });
   const oldEntry = join(baseline, "src", "runTranscript.ts");
   const newEntry = join(repo, "src", "runTranscript.ts");
-  const config = ["--config", join(repo, "plugins.config.json")];
+  const emptyConfig = join(scratch, "empty.config.json");
+  writeFileSync(emptyConfig, '{"plugins":[]}');
+  const config = ["--config", emptyConfig];
   for (const [transcript, svg] of sessions) {
     const source = transcript.startsWith("fixtures/") ? baseline : repo;
     const input = readFileSync(join(source, transcript));
