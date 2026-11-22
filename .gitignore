@@ -2,4 +2,6 @@ node_modules/
 dist/
 *.svg
 !fixtures/**/*.svg
+!vscode-svg/example/example.svg
+!vscode-svg/example/not-a-file.svg/
 .DS_Store

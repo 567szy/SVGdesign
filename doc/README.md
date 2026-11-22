@@ -1,5 +1,43 @@
 # SVG 编辑器（CLI）架构方案
 
+## Phase 2 · VS Code 扩展实践
+
+扩展源码位于 [vscode-svg](../vscode-svg)，示例工作区位于 [vscode-svg/example](../vscode-svg/example)。
+
+### 安装与启动
+
+使用 VS Code 1.90 或更高版本。在仓库根目录执行以下命令，安装依赖、编译并打开扩展开发宿主。
+
+```sh
+npm ci --prefix vscode-svg
+npm run build --prefix vscode-svg
+code --new-window --disable-extensions --extensionDevelopmentPath="$PWD/vscode-svg" "$PWD/vscode-svg/example"
+```
+
+在 Explorer 展开示例工作区。只有 `example.svg` 应显示 `[]`。打开文件并展开「大纲」，可看到两层分组、矩形和无 id 的 `text`。点击 `rect#start` 定位到第 4 行。示例工作区已设定 SVG 使用文本编辑器。若在其他工作区中点击大纲节点跳回图片预览，可在该工作区设置 `"workbench.editorAssociations": { "*.svg": "default" }`。
+
+### 宿主与插件的调用关系
+
+VS Code 在启动完成后调用 `activate`。扩展实例化两个 provider 并注册到 VS Code，注册句柄由扩展上下文负责释放。Explorer 渲染资源时调用 `SvgFileDecorationProvider`。它通过 `workspace.fs.stat` 区分文件与目录，并为 SVG 文件返回 `FileDecoration` 元数据。Explorer 负责绘制标记，整个调用只读取资源元数据。
+
+VS Code 在打开 SVG 文本文档或编辑内容后请求文档符号。`SvgDocumentSymbolProvider` 从当前编辑缓冲区读取文本，把 XML 元素树适配成 `DocumentSymbol` 树，并用 `positionAt` 把源码偏移转换为编辑器位置。原生大纲负责渲染、刷新和定位。`range` 覆盖整个元素，`selectionRange` 覆盖起始标签名。XML 暂时不完整时，解析器记录错误并返回空大纲。
+
+### 模式与 Phase 1 复用评估
+
+- **Decorator**。Explorer 的文件条目是被装饰的对象。Explorer 把原有条目与 provider 返回的附加元数据组合渲染，相当于在界面上给条目增添显示行为。经典 Decorator 通常包装一个实现同一组件接口的实例，并在转发调用时附加行为。这里 provider 实现的是 VS Code 的回调接口，条目的接口和生命周期仍由宿主掌管。
+- **Adapter**。文件标记 provider 把 `Uri` 和 `FileStat` 适配为宿主需要的 `FileDecoration`。大纲 provider 把解析后的元素名、子节点和源码偏移适配为 `DocumentSymbol`。两处都通过对象组合完成转换，宿主通过各自的 provider 接口发起调用。
+- **Phase 1 复用**。`SvgReader` 的树形解析思路可借鉴，但它会剥离序言和注释，内部节点没有原始源码偏移，随后还会为无 id 的图形分配 id。`ShapeFactory` 和 `Group` 服务于 CLI 的可编辑图形，`TreeCommand` 生成终端文本。大纲需要保留任意 XML 元素、原始 id 和源码范围，因此使用独立的 XML 事件解析器，保留了父子树遍历的思路。
+
+### 验证与协作记录
+
+在 VS Code 1.143.0 中先观察原有行为。SVG 默认进入图片预览，切换到文本编辑器并展开原生大纲后，`fixtures/other.svg` 显示找不到符号。开发宿主中验证了以下结果。
+
+- [文件标记和源码定位](vscode-svg/badge-and-outline.jpg)。`example.svg` 有标记，`control.txt` 与 `not-a-file.svg` 目录无标记。大纲保留两层分组和无 id 的 `text`，选中 `rect#start` 后光标定位到第 4 行。
+- [不完整 XML](vscode-svg/incomplete-xml.jpg)。在缓冲区删掉 `</svg>` 最后一个 `>`，大纲清空。撤销该编辑后大纲恢复，整个过程无需保存文件。
+- 执行 `npm --prefix vscode-svg test`，验证嵌套分组、无 id 元素、源码范围、不完整 XML 和下一次有效编辑。
+
+检查 AI 初稿时发现，仅根据后缀无法区分名为 `*.svg` 的目录，因此增加了文件类型检查和同名后缀目录作为对照。实际点击大纲还发现，仅临时切换文本编辑器时，VS Code 可能在定位时重新选择图片预览。将编辑器关联限定在示例工作区后，点击定位成功。
+
 Lab1 Phase 1。实现语言：TypeScript + 面向对象。入口：`npm run cli`。
 
 ## 1. 模块划分

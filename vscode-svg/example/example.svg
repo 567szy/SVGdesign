@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 80">
+  <g id="diagram">
+    <g id="node">
+      <rect id="start" x="10" y="10" width="170" height="60" fill="steelblue"/>
+      <text x="60" y="45" fill="white">Start</text>
+    </g>
+  </g>
+</svg>

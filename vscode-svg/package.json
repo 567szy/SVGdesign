@@ -1,0 +1,25 @@
+{
+  "name": "course-svg-tools",
+  "displayName": "Course SVG Tools",
+  "version": "0.1.0",
+  "private": true,
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "main": "./dist/extension.js",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "test": "npm run build && node --test test/*.test.cjs"
+  },
+  "dependencies": {
+    "saxes": "^6.0.0",
+    "svg-editor-cli": "file:.."
+  },
+  "devDependencies": {
+    "@types/vscode": "1.90.0",
+    "typescript": "^5.7.2"
+  }
+}
