@@ -40,6 +40,87 @@ VS Code 在打开 SVG 文本文档或编辑内容后请求文档符号。`SvgDoc
 
 ## Phase 2 · CLI 框架
 
+### 重构前后的模块依赖
+
+Phase 1 的 REPL 负责实例化编辑器、命令执行器和读写器。命令工厂按名称构造具体命令，图形工厂按类型构造具体图形。新增命令或类型会改动对应的工厂。
+
+```plantuml
+@startuml
+title Phase 1 · final
+package "CLI" {
+  [REPL]
+}
+package "命令" {
+  [CommandFactory]
+  [具体命令]
+  [CommandInvoker]
+}
+package "SVG 读写" {
+  [SvgReader]
+  [SvgWriter]
+}
+package "领域模型" {
+  [ShapeFactory]
+  [具体图形]
+  [Editor / SvgDocument]
+}
+[REPL] --> [CommandFactory] : 分发
+[REPL] --> [CommandInvoker] : 执行与撤销
+[CommandFactory] --> [具体命令] : 按名称构造
+[具体命令] --> [Editor / SvgDocument]
+[具体命令] --> [ShapeFactory] : create
+[具体命令] --> [SvgReader] : read
+[具体命令] --> [SvgWriter] : save
+[SvgReader] --> [ShapeFactory] : 构造图形
+[ShapeFactory] --> [具体图形] : 按类型构造
+@enduml
+```
+
+Phase 2 由组合根负责创建和装配。CLI 分发命令、读写 SVG、处理属性和渲染结构树时都通过扩展契约访问注册项。插件通过公开的领域对象和注册接口提供实现。动态解析与清单校验位于装配层。
+
+```plantuml
+@startuml
+title Phase 2 · p2
+package "装配层" {
+  [CLI 启动 / 会话回放]
+  [createApp]
+  [PluginLoader]
+  artifact "plugins.config.json" as Config
+}
+package "CLI 内核" {
+  [REPL / CommandInvoker]
+  [CommandFactory]
+  [ShapeFactory / SvgReader]
+  [SetCommand]
+  [TreeCommand]
+  [Editor / SvgDocument]
+  interface "注册表及四个扩展契约" as Contracts
+}
+package "插件" {
+  [内置命令和图形注册]
+  [stats / dir]
+  [box]
+  [modified-star]
+}
+[CLI 启动 / 会话回放] --> [createApp]
+[createApp] --> [REPL / CommandInvoker]
+[createApp] --> [PluginLoader] : 代码装配或配置装配
+[createApp] --> [内置命令和图形注册]
+[PluginLoader] --> Config : 配置装配
+[PluginLoader] --> Contracts : 暂存、校验、注册
+[REPL / CommandInvoker] --> [CommandFactory]
+[CommandFactory] --> Contracts : 命令
+[ShapeFactory / SvgReader] --> Contracts : 图形
+[SetCommand] --> Contracts : 属性
+[TreeCommand] --> Contracts : 标签
+[REPL / CommandInvoker] --> [Editor / SvgDocument]
+[内置命令和图形注册] --> Contracts
+[stats / dir] --> Contracts
+[box] --> Contracts
+[modified-star] --> Contracts
+@enduml
+```
+
 ### 扩展点清单
 
 四项扩展的契约集中在 [Extensions.ts](../src/core/Extensions.ts) 和 [Command.ts](../src/commands/Command.ts)。框架始终注册 Phase 1 内置能力，按装配选择加载可选插件。
@@ -112,6 +193,24 @@ npm run replay -- --config plugins.config.json doc/transcript/cli-1.txt
 - `npm test` 验证加载器故障和回滚、注册扩展点、属性写入和两种装配执行同一个测试命令。
 - `npm run regression` 从 `final` 提取基线源码和样例，在独立临时目录回放三份输入。对代码装配和空配置装配分别比较命令输出与生成的 SVG 文件，比较使用原始字节。
 - `npm run metrics -- final HEAD` 从 Git 历史生成运行源码清单、行数和圈复杂度。
+
+### 项目交付与复现
+
+| 验收内容 | 复现方式 |
+| --- | --- |
+| VS Code 文件标记、大纲、定位、异常 XML | 参照本页 VS Code 启动步骤和两张实机截图。运行 `npm ci --prefix vscode-svg` 和 `npm --prefix vscode-svg test` |
+| CLI 类型检查、插件与加载器 | 安装根目录依赖后运行 `npm run build` 和 `npm test`。覆盖动态加载错误、清单拒绝、重复注册、属性回滚、目录适配器、box 读回和树标签保存点 |
+| Phase 1 兼容性 | 运行 `npm run regression`。此脚本需要 Git 中的 `final` 标签和 `tar`，对照三个会话的输出和保存文件 |
+| 双装配 | `npm test` 包含新增命令及 box 会话的双装配比较。固定目录内回放，日志留在进程输出，不参与 `dir` 枚举 |
+| 迭代指标 | [框架节点](../docs/metrics/framework.md) 和 [final 到 p2](../docs/metrics/final-to-p2.md)。使用 `npm --silent run metrics -- final p2 --no-revisions` 可复现最终报告 |
+
+### Phase 2 AI 协作与修正
+
+- **VS Code 验证**。实机测试补充了带 `.svg` 后缀的目录作为对照，也发现从图片预览临时切换到文本模式会影响大纲定位。最终由示例工作区指定文本编辑器，并用源码定位和不完整 XML 的截图复核。
+- **插件装配验证**。检查加载器时，把顶层模块解析与模块求值分成可分别判定的步骤。用缺少依赖的测试包确认已找到的插件会报告加载失败，且后续插件仍能启用。
+- **Box 接入边界**。运行示例时发现通用命令接口缺少复合图形的输出提示。先提交通用行为并对照 `final`，再分别提交代码装配和配置装配。用 Git 快照回放验证两个接入提交的实际行为。
+- **树标签保存点**。检查按编辑命令计数的思路后，改为比较当前内容和已存检查点。测试覆盖编辑、保存、再编辑、撤销、重做及读回，验证回到保存点后星号消失。
+- **指标分类**。逐项核对报告时发现仓库根目录的 `plugins/` 路径被归入内核。修正路径判定后重新从 Git 生成报告，并检查插件、装配和内核的归类。
 
 Lab1 Phase 1。实现语言：TypeScript + 面向对象。入口：`npm run cli`。
 

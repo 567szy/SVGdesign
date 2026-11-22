@@ -1,7 +1,8 @@
 import { execFileSync } from "node:child_process";
 import ts from "typescript";
 
-const [base = "final", head = "HEAD"] = process.argv.slice(2);
+const args = process.argv.slice(2);
+const [base = "final", head = "HEAD"] = args.filter((arg) => arg !== "--no-revisions");
 
 function git(...args) {
   return execFileSync("git", args, { encoding: "utf8" });
@@ -32,7 +33,7 @@ function describe(path) {
   if (path.startsWith("vscode-svg/")) {
     return ["VS Code", path.endsWith("/outline.ts") ? "XML 元素与源码范围" : "宿主扩展注册"];
   }
-  if (path.includes("/plugins/")) return ["插件", "可选扩展实现"];
+  if (path.startsWith("plugins/") || path.startsWith("src/plugins/")) return ["插件", "可选扩展实现"];
   if (path.startsWith("src/builtins/")) return ["插件", "Phase 1 内置能力注册"];
   if (path.startsWith("src/assembly/") || ["src/index.ts", "src/runTranscript.ts"].includes(path)) {
     return ["装配处", "启动、装配或插件加载"];
@@ -67,7 +68,9 @@ const groups = ["内核", "装配处", "插件", "VS Code"];
 const label = (ref) => `\`${ref}\` (\`${git("rev-parse", "--short", ref).trim()}\`)`;
 const delta = (after, before) => `${after - before > 0 ? "+" : ""}${after - before}`;
 console.log("# CLI 重构指标\n");
-console.log(`${label(base)} → ${label(head)}\n`);
+if (!args.includes("--no-revisions")) {
+  console.log(`${label(base)} → ${label(head)}\n`);
+}
 console.log("使用 `npm run metrics -- <基线提交> <目标提交>` 从 Git 对象生成。行数包含空行和注释。圈复杂度按文件汇总，每个模块和每个有实现的函数从 1 起算，条件分支、循环、非 default 的 case、catch 和短路逻辑各加 1。VS Code 单独列出。\n");
 console.log("| 分类 | 基线行数 | 目标行数 | 行数增量 | 基线圈复杂度 | 目标圈复杂度 | 圈复杂度增量 |");
 console.log("| --- | ---: | ---: | ---: | ---: | ---: | ---: |");
